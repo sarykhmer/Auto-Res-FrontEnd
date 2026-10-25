@@ -96,7 +96,7 @@
                     }
                     lastError = new Error('Server responded with ' + response.status + ' at ' + url);
                 } catch (e) {
-                    lastError = new Error('Cannot reach ' + (url) + ' (server offline, wrong URL, or CORS not allowed)');
+                    lastError = new Error('Cannot reach (server offline, wrong URL, or CORS not allowed)');
                 }
             }
             throw lastError;
