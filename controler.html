@@ -79,25 +79,41 @@
         // You can also override with ?api=https://your-server in the page URL.
         const REMOTE_API_BASE = 'https://tz7s8z8q9k.apps.bot-hosting.cloud';
         const apiOverride = new URLSearchParams(location.search).get('api');
+        const authToken = sessionStorage.getItem('authToken');
         const API_BASES = apiOverride
             ? [apiOverride]
             : (location.protocol.startsWith('http') ? ['', REMOTE_API_BASE] : [REMOTE_API_BASE]);
         let API_URL = '';
 
+        if (!authToken) {
+            location.replace('index.html');
+        }
+
         async function findApi() {
             let lastError;
             for (const base of API_BASES) {
                 const url = base.replace(/\/+$/, '') + '/api/settings';
+                let response;
                 try {
-                    const response = await fetch(url, { cache: 'no-store' });
-                    if (response.ok) {
-                        API_URL = url;
-                        return await response.json();
-                    }
-                    lastError = new Error('Server responded with ' + response.status + ' at ' + url);
-                } catch (e) {
+                    response = await fetch(url, {
+                        cache: 'no-store',
+                        headers: { Authorization: 'Bearer ' + authToken }
+                    });
+                } catch {
                     lastError = new Error('Cannot reach (server offline, wrong URL, or CORS not allowed)');
+                    continue;
                 }
+
+                if (response.ok) {
+                    API_URL = url;
+                    return await response.json();
+                }
+                if (response.status === 401) {
+                    sessionStorage.removeItem('authToken');
+                    location.replace('index.html');
+                    throw new Error('Your session expired. Please sign in again.');
+                }
+                lastError = new Error('Server responded with ' + response.status + ' at ' + url);
             }
             throw lastError;
         }
@@ -129,9 +145,17 @@
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: 'Bearer ' + authToken
+                    },
                     body: JSON.stringify({ name, enabled: nextValue })
                 });
+                if (response.status === 401) {
+                    sessionStorage.removeItem('authToken');
+                    location.replace('index.html');
+                    throw new Error('Your session expired. Please sign in again.');
+                }
                 if (!response.ok) {
                     throw new Error('Could not update the setting.');
                 }
